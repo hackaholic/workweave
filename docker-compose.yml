@@ -6,17 +6,21 @@ services:
     container_name: workweave
     restart: unless-stopped
     ports:
-      - "${WORKWEAVE_PORT:-8088}:8088"
+      - "127.0.0.1:${WORKWEAVE_PORT:-8088}:8088"
     environment:
       - WORKWEAVE_PORT=8088
-      - WORKWEAVE_TARGET=/workspace
+      - WORKWEAVE_DATA_DIR=/data
+      - WORKWEAVE_PROJECTS_ROOT=/projects
       - WORKWEAVE_HOST=0.0.0.0
-      - WORKWEAVE_TITLE=${WORKWEAVE_TITLE:-Crochet}
     volumes:
-      - "${TARGET_PATH:-/home/anu/git/crochet}:/workspace:ro"
+      - "${PROJECTS_PATH:-..}:/projects"
+      - workweave-data:/data
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8088/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
       start_period: 5s
+
+volumes:
+  workweave-data:

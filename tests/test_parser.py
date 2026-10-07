@@ -131,6 +131,62 @@ Configure PostgreSQL schema and migrations.
             self.assertEqual(state.completed_subtasks, 3)
             self.assertEqual(state.overall_progress_percent, 75)
 
+    def test_comments_and_subtask_mutations(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            work_dir = root / "work"
+            work_dir.mkdir()
+            (work_dir / "INDEX.md").write_text(
+                "- **Work 001 — Core** · Pending · [work folder](work-001/)\n",
+                encoding="utf-8",
+            )
+            w1 = work_dir / "work-001"
+            w1.mkdir()
+            (w1 / "README.md").write_text("# Work 001 — Core\n\n## Goal\nTest goal", encoding="utf-8")
+            (w1 / "tasks.md").write_text("# Tasks\n\n- [ ] 1.1 First task\n", encoding="utf-8")
+
+            # 1. Add comment
+            from workweave.parser import (
+                add_work_comment,
+                create_subtask,
+                create_work_item,
+                scaffold_draft_work,
+                update_subtask,
+            )
+            comment = add_work_comment(root, "work-001", "This is a test comment", author="Tester", subtask_id="1-1-first-task")
+            self.assertEqual(comment.author, "Tester")
+            self.assertIn("This is a test comment", (w1 / "comments.md").read_text(encoding="utf-8"))
+
+            # 2. Update subtask
+            updated = update_subtask(root, "work-001", "1-1-first-task", new_title="1.1 Renamed first task", completed=True)
+            self.assertTrue(updated)
+            tasks_content = (w1 / "tasks.md").read_text(encoding="utf-8")
+            self.assertIn("- [x] 1.1 Renamed first task", tasks_content)
+
+            # 3. Create subtask
+            st = create_subtask(root, "work-001", "1.2 Second task", owner="Antigravity")
+            self.assertIn("1.2 Second task", st.title)
+            self.assertEqual(st.owner, "Antigravity")
+            self.assertIn("1.2 Second task", (w1 / "tasks.md").read_text(encoding="utf-8"))
+
+            # 4. Create new work draft
+            folder = create_work_item(root, "New Feature", description="My user notes", is_draft=True)
+            self.assertTrue(folder.startswith("work-002-"))
+            self.assertTrue((work_dir / folder / "README.md").is_file())
+            self.assertIn("New Feature", (work_dir / "INDEX.md").read_text(encoding="utf-8"))
+
+            # Verify parsed state shows draft and comments
+            state = parse_work_directory(root)
+            self.assertEqual(state.total_work_items, 2)
+            self.assertEqual(len(state.items[0].comments), 1)
+            self.assertTrue(state.items[1].is_draft)
+
+            # 5. Scaffold draft work
+            scaffolded = scaffold_draft_work(root, "work-002")
+            self.assertTrue(scaffolded)
+            self.assertTrue((work_dir / folder / "tasks" / "task-2.1.md").is_file())
+            self.assertIn("In Progress", (work_dir / "INDEX.md").read_text(encoding="utf-8"))
+
     def test_parse_real_crochet_work_dir(self):
         crochet_dir = Path("/home/anu/git/crochet")
         if (crochet_dir / "work").is_dir():

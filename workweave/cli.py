@@ -23,8 +23,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--target",
         "-t",
-        default=os.environ.get("WORKWEAVE_TARGET", "."),
-        help="Path to project directory containing 'work/' or direct path to 'work/' folder (default: current directory or $WORKWEAVE_TARGET)",
+        default=os.environ.get("WORKWEAVE_TARGET"),
+        help="Path to project directory containing 'work/' or direct path to 'work/' folder (optional: register this project on startup)",
     )
     parser.add_argument(
         "--port",
@@ -35,8 +35,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--host",
-        default=os.environ.get("WORKWEAVE_HOST", "0.0.0.0"),
-        help="Host interface to bind the server on (default: 0.0.0.0 or $WORKWEAVE_HOST)",
+        default=os.environ.get("WORKWEAVE_HOST", "127.0.0.1"),
+        help="Host interface to bind the server on (default: 127.0.0.1 or $WORKWEAVE_HOST)",
     )
     parser.add_argument(
         "--title",
@@ -54,6 +54,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Output parsed workflow state as JSON to stdout and exit",
     )
+    parser.add_argument("--data-dir", default=os.environ.get("WORKWEAVE_DATA_DIR"),
+                        help="Directory for the persistent project registry")
+    parser.add_argument("--projects-root", default=os.environ.get("WORKWEAVE_PROJECTS_ROOT"),
+                        help="Restrict project paths to this parent folder (optional)")
     parser.add_argument(
         "--version",
         "-v",
@@ -67,10 +71,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
 
-    target_path = Path(args.target).resolve()
+    target_path = Path(args.target).expanduser().resolve() if args.target else None
 
     if args.json:
-        state = parse_work_directory(target_path, project_title=args.title)
+        state = parse_work_directory(target_path or Path.cwd(), project_title=args.title)
         try:
             print(json.dumps(asdict(state), indent=2))
         except BrokenPipeError:
@@ -78,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.build:
-        state = parse_work_directory(target_path, project_title=args.title)
+        state = parse_work_directory(target_path or Path.cwd(), project_title=args.title)
         html_content = generate_html_dashboard(state)
         output_file = Path(args.build).resolve()
         output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -92,6 +96,8 @@ def main(argv: list[str] | None = None) -> int:
         port=args.port,
         target_path=target_path,
         project_title=args.title,
+        data_dir=args.data_dir,
+        projects_root=args.projects_root,
     )
     return 0
 
