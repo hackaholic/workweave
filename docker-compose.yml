@@ -11,7 +11,7 @@ services:
       - WORKWEAVE_PORT=8088
       - WORKWEAVE_TARGET=/workspace
       - WORKWEAVE_HOST=0.0.0.0
-      - WORKWEAVE_TITLE=${WORKWEAVE_TITLE:-}
+      - WORKWEAVE_TITLE=${WORKWEAVE_TITLE:-Crochet}
     volumes:
       - "${TARGET_PATH:-/home/anu/git/crochet}:/workspace:ro"
     healthcheck:
