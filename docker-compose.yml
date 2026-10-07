@@ -1,0 +1,22 @@
+services:
+  workweave:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: workweave
+    restart: unless-stopped
+    ports:
+      - "${WORKWEAVE_PORT:-8088}:8088"
+    environment:
+      - WORKWEAVE_PORT=8088
+      - WORKWEAVE_TARGET=/workspace
+      - WORKWEAVE_HOST=0.0.0.0
+      - WORKWEAVE_TITLE=${WORKWEAVE_TITLE:-}
+    volumes:
+      - "${TARGET_PATH:-/home/anu/git/crochet}:/workspace:ro"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8088/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
