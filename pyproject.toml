@@ -23,3 +23,6 @@ workweave = "workweave.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["workweave*"]
+
+[tool.setuptools.package-data]
+workweave = ["templates/*.html", "static/*.css", "static/*.js"]

@@ -118,10 +118,33 @@ class TestServer(unittest.TestCase):
                     data=json.dumps({"work_id": "work-001", "subtask_id": "1-1-first-task", "completed": False}).encode("utf-8"),
                     headers={"Content-Type": "application/json", "X-WorkWeave-Request": "1"},
                 )
+                with self.assertRaises(urllib.error.HTTPError) as denied:
+                    urllib.request.urlopen(req)
+                self.assertEqual(denied.exception.code, 409)
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/projects") as response:
+                    project_id = json.load(response)["projects"][0]["id"]
+                req = urllib.request.Request(
+                    f"http://127.0.0.1:{port}/api/lifecycle",
+                    data=json.dumps({"project_id": project_id, "work_id": "work-001", "action": "enroll",
+                                     "actor": "User", "expected_version": 0}).encode(),
+                    headers={"Content-Type": "application/json", "X-WorkWeave-Request": "1"})
                 with urllib.request.urlopen(req) as response:
                     self.assertEqual(response.status, 200)
 
-                # 3. Create draft work
+                # 3. Create subtask
+                req = urllib.request.Request(
+                    f"http://127.0.0.1:{port}/api/subtasks/new",
+                    data=json.dumps({"work_id": "work-001", "title": "Added Test Subtask", "owner": "Antigravity"}).encode("utf-8"),
+                    headers={"Content-Type": "application/json", "X-WorkWeave-Request": "1"},
+                )
+                with urllib.request.urlopen(req) as response:
+                    self.assertEqual(response.status, 201)
+                    data = json.loads(response.read().decode("utf-8"))
+                    self.assertEqual(data["status"], "ok")
+                    self.assertIn("Added Test Subtask", data["subtask"]["title"])
+                    self.assertEqual(data["subtask"]["owner"], "Antigravity")
+
+                # 4. Create draft work
                 req = urllib.request.Request(
                     f"http://127.0.0.1:{port}/api/work/new",
                     data=json.dumps({"title": "API Created Work", "description": "From test", "is_draft": True}).encode("utf-8"),

@@ -249,7 +249,7 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
       </div>
       <form id="new-work-form" onsubmit="submitNewWork(event)" class="p-5 space-y-3.5">
         <div class="bg-amber-950/40 p-2.5 rounded border border-amber-800/40 text-[11px] text-amber-300">
-          <strong>Note:</strong> Items added by you start as a <em>User Draft</em>. AI can later scaffold standard goals, subtasks, and contracts using the <strong>🤖 AI Scaffold</strong> button.
+          <strong>Note:</strong> Items added by you start as a <em>User Draft</em>. Use <strong>Plan &amp; review</strong> to hand the request to your agent, review its plan, and approve implementation.
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-400 mb-1">Work Item Title</label>
@@ -262,6 +262,45 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
         <div class="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
           <button type="button" onclick="closeNewWorkModal()" class="px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-xs text-gray-300">Cancel</button>
           <button type="submit" class="px-3.5 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-xs text-white font-medium">Create Work Draft</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Subtask Modal -->
+  <div id="subtask-modal" class="fixed inset-0 z-50 hidden bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl max-w-md w-full shadow-2xl overflow-hidden">
+      <div class="px-5 py-3.5 border-b border-[var(--border)] bg-gray-900/50 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span>☑️</span>
+          <h3 class="text-sm font-bold text-white">Add Subtask</h3>
+        </div>
+        <button type="button" onclick="closeSubtaskModal()" class="text-gray-400 hover:text-white p-1 rounded-md hover:bg-gray-800 transition">✕</button>
+      </div>
+      <form id="subtask-form" onsubmit="submitSubtaskModal(event)" class="p-5 space-y-3.5">
+        <input type="hidden" id="subtask-work-id" />
+        <div>
+          <label class="block text-xs font-medium text-gray-400 mb-1">Subtask Title / Action Item</label>
+          <input
+            type="text"
+            id="subtask-modal-title"
+            required
+            placeholder="e.g. Implement token validation"
+            class="w-full bg-gray-800 border border-[var(--border)] rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-400 mb-1">Assignee / Owner (Optional)</label>
+          <input
+            type="text"
+            id="subtask-modal-owner"
+            placeholder="e.g. Owner, Gemini, Claude, Codex"
+            class="w-full bg-gray-800 border border-[var(--border)] rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+          />
+        </div>
+        <div class="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
+          <button type="button" onclick="closeSubtaskModal()" class="px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-xs text-gray-300">Cancel</button>
+          <button type="submit" id="subtask-modal-submit-btn" class="px-3.5 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-xs text-white font-medium">Add Subtask</button>
         </div>
       </form>
     </div>
@@ -401,9 +440,11 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
         <div class="flex items-center gap-2">
           ${{item.is_draft ? `
             <button onclick="scaffoldWork('${{item.id}}')" class="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1">
-              <span>🤖</span> AI Scaffold
+              Prepare structure
             </button>
           ` : ''}}
+          ${{PROJECT_ID ? `<a href="/projects/${{encodeURIComponent(PROJECT_ID)}}/work/${{encodeURIComponent(item.id)}}/review" class="px-2.5 py-1 rounded bg-indigo-600 text-white text-xs">Plan &amp; review</a>` : ''}}
+          <span class="text-xs text-indigo-300">${{escapeHtml(item.lifecycle?.phase || 'Legacy / needs review')}}</span>
           ${{getStatusBadge(item.status)}}
         </div>
       `;
@@ -455,10 +496,21 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
       html += `
         <div>
           <div class="flex items-center justify-between mb-2">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
-              <span>☑️</span> Subtasks & Checklist
-            </h3>
-            <span class="text-xs font-mono text-gray-400">${{item.completed_subtasks}} of ${{item.total_subtasks}} completed (${{item.progress_percent}}%)</span>
+            <div class="flex items-center gap-2">
+              <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                <span>☑️</span> Subtasks & Checklist
+              </h3>
+              <span class="text-xs font-mono text-gray-400">(${{item.completed_subtasks}} of ${{item.total_subtasks}} completed · ${{item.progress_percent}}%)</span>
+            </div>
+            <button
+              type="button"
+              id="btn-add-subtask-header"
+              onclick="openAddSubtaskModal('${{item.id}}')"
+              class="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition flex items-center gap-1 shadow-sm"
+              title="Add a new subtask"
+            >
+              <span>+</span> Add Subtask
+            </button>
           </div>
 
           <div class="bg-[var(--card)] rounded-lg border border-[var(--border)] divide-y divide-[var(--border)] overflow-hidden">
@@ -466,7 +518,16 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
 
       if (item.subtasks.length === 0) {{
         html += `
-          <div class="p-4 text-xs text-center text-gray-500">No subtasks found in tasks.md</div>
+          <div class="p-6 text-center text-gray-500 flex flex-col items-center gap-2">
+            <div class="text-xs">No subtasks found in tasks.md</div>
+            <button
+              type="button"
+              onclick="openAddSubtaskModal('${{item.id}}')"
+              class="px-3 py-1.5 rounded bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-700/50 text-xs font-medium transition flex items-center gap-1"
+            >
+              <span>+</span> Add First Subtask
+            </button>
+          </div>
         `;
       }} else {{
         item.subtasks.forEach((st, idx) => {{
@@ -540,14 +601,19 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
               <input
                 type="text"
                 id="new-subtask-input-${{item.id}}"
-                placeholder="Add subtask to tasks.md..."
+                placeholder="Quick add subtask to tasks.md..."
                 onkeydown="if(event.key==='Enter') quickAddSubtask('${{item.id}}')"
                 class="flex-1 bg-gray-800/80 border border-gray-700 rounded px-2.5 py-1 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
               />
               <button
+                type="button"
+                id="btn-quick-add-subtask-${{item.id}}"
                 onclick="quickAddSubtask('${{item.id}}')"
-                class="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition"
-              >+ Add</button>
+                class="px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition flex items-center gap-1 shrink-0"
+                title="Add Subtask"
+              >
+                <span>+</span> Add Subtask
+              </button>
             </div>
           </div>
         </div>
@@ -650,6 +716,18 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
       `;
 
       bodyEl.innerHTML = html;
+      const isManaged = Boolean(item.lifecycle?.managed);
+      const canExecute = Boolean(PROJECT_ID && isManaged && item.lifecycle?.phase === 'In progress' && item.lifecycle?.approval_valid);
+      const canEdit = Boolean(PROJECT_ID && (!isManaged || (item.lifecycle?.phase === 'Draft' && !item.lifecycle?.plans?.length)));
+      bodyEl.querySelectorAll('[onclick]').forEach(control => {{
+        const action = control.getAttribute('onclick');
+        if ((action.includes('toggleSubtask(') && !canExecute) ||
+            ((action.includes('editSubtaskTitle(') || action.includes('quickAddSubtask(') || action.includes('openAddSubtaskModal(')) && !canEdit) ||
+            (!PROJECT_ID && action.includes('openAddCommentModal('))) {{
+          control.disabled = true; control.title = 'Use Plan & review before changing implementation tasks.';
+        }}
+      }});
+      bodyEl.querySelectorAll('input[id^="new-subtask-input-"]').forEach(input => {{input.disabled = !canEdit;}});
     }}
 
     function selectItem(id) {{
@@ -690,6 +768,8 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
       if (PROJECT_ID && !payload.project_id) {{
         payload.project_id = PROJECT_ID;
       }}
+      const currentItem = DATA.items.find(item => item.id === payload.work_id);
+      if (currentItem?.lifecycle?.version) payload.expected_version = currentItem.lifecycle.version;
       const res = await fetch(endpoint, {{
         method: 'POST',
         headers: {{
@@ -761,11 +841,13 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
 
     async function toggleSubtask(workId, subtaskId, newCompleted) {{
       try {{
-        await apiPost('/api/subtasks/toggle', {{
+        const response = await apiPost('/api/subtasks/toggle', {{
           work_id: workId,
           subtask_id: subtaskId,
           completed: newCompleted,
         }});
+        const changed = DATA.items.find(i => i.id === workId);
+        if (changed && response.lifecycle) changed.lifecycle = response.lifecycle;
         const item = DATA.items.find(i => i.id === workId);
         if (item) {{
           const st = item.subtasks.find(s => s.id === subtaskId);
@@ -805,11 +887,71 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
       }}
     }}
 
+    function openAddSubtaskModal(workId) {{
+      document.getElementById('subtask-work-id').value = workId;
+      document.getElementById('subtask-modal-title').value = '';
+      document.getElementById('subtask-modal-owner').value = '';
+      document.getElementById('subtask-modal').classList.remove('hidden');
+      setTimeout(() => document.getElementById('subtask-modal-title').focus(), 50);
+    }}
+
+    function closeSubtaskModal() {{
+      document.getElementById('subtask-modal').classList.add('hidden');
+    }}
+
+    async function submitSubtaskModal(e) {{
+      e.preventDefault();
+      const workId = document.getElementById('subtask-work-id').value;
+      const title = document.getElementById('subtask-modal-title').value.trim();
+      const owner = document.getElementById('subtask-modal-owner').value.trim();
+      if (!title) return;
+
+      const btn = document.getElementById('subtask-modal-submit-btn');
+      if (btn) {{
+        btn.disabled = true;
+        btn.textContent = 'Adding...';
+      }}
+
+      try {{
+        const res = await apiPost('/api/subtasks/new', {{
+          work_id: workId,
+          title: title,
+          owner: owner,
+        }});
+        closeSubtaskModal();
+        const item = DATA.items.find(i => i.id === workId);
+        if (item) {{
+          item.subtasks.push(res.subtask);
+          item.total_subtasks = item.subtasks.length;
+          item.completed_subtasks = item.subtasks.filter(s => s.completed).length;
+          item.progress_percent = Math.round((item.completed_subtasks / item.total_subtasks) * 100);
+          renderList();
+          renderDetail();
+        }}
+      }} catch (err) {{
+        alert('Failed to add subtask: ' + err.message);
+      }} finally {{
+        if (btn) {{
+          btn.disabled = false;
+          btn.textContent = 'Add Subtask';
+        }}
+      }}
+    }}
+
     async function quickAddSubtask(workId) {{
       const input = document.getElementById('new-subtask-input-' + workId);
       if (!input) return;
       const title = input.value.trim();
-      if (!title) return;
+      if (!title) {{
+        openAddSubtaskModal(workId);
+        return;
+      }}
+
+      const btn = document.getElementById('btn-quick-add-subtask-' + workId);
+      if (btn) {{
+        btn.disabled = true;
+        btn.textContent = 'Adding...';
+      }}
 
       try {{
         const res = await apiPost('/api/subtasks/new', {{
@@ -828,6 +970,11 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
         }}
       }} catch (err) {{
         alert('Failed to add subtask: ' + err.message);
+      }} finally {{
+        if (btn) {{
+          btn.disabled = false;
+          btn.innerHTML = '<span>+</span> Add Subtask';
+        }}
       }}
     }}
 
@@ -862,14 +1009,14 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
     }}
 
     async function scaffoldWork(workId) {{
-      if (!confirm('Run AI scaffolding on this user draft work item?\\n\\nThis will format formal objectives, generate structured subtask contracts in tasks/, and set status to In Progress.')) {{
+      if (!confirm('Prepare missing workflow files? Existing content is preserved. This does not run AI or start implementation.')) {{
         return;
       }}
       try {{
         await apiPost('/api/work/scaffold', {{ work_id: workId }});
         location.reload();
       }} catch (err) {{
-        alert('Scaffolding error: ' + err.message);
+        alert('Preparation error: ' + err.message);
       }}
     }}
 

@@ -1,7 +1,7 @@
 # Task 002 — Browse project folders
 
 **Owner:** Codex
-**Status:** In Progress
+**Status:** Completed
 
 ## Objective
 Browse server-visible folders and select a project from the Add project form.
@@ -25,13 +25,13 @@ Work 001 registry and registration API; projects.py, server.py, project_ui.py, t
 
 ## Security validation
 Read-only directory enumeration shares existing Host/Origin validation. Enforce configured root after resolving symlinks; don't expose file contents. Folder names render via textContent. Add revalidates selection. Negative tests must assert no registry writes.
-Disposition: Pending.
+Disposition: Pass for the local single-user scope. Boundary, malformed path, foreign Host/Origin and no-write checks pass. Folder labels use textContent; selection is revalidated on registration.
 
 ## Acceptance checks
-- [ ] API and negative tests pass.
-- [ ] Picker selects folders without manual typing and cancellation does not change the form.
-- [ ] Browser and Docker flow verified.
-- [ ] Documentation and self-review complete.
+- [x] API and negative tests pass.
+- [x] Picker selects folders without manual typing and cancellation does not change the form.
+- [x] Browser and Docker flow verified.
+- [x] Documentation and self-review complete.
 
 ## Handoff back
 Update work-local evidence and statuses; provide the running app URL.

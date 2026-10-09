@@ -29,3 +29,5 @@ htmlcov/
 # WorkWeave output
 *.html
 !tests/
+
+!workweave/templates/*.html

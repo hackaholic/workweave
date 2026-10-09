@@ -184,8 +184,8 @@ Configure PostgreSQL schema and migrations.
             # 5. Scaffold draft work
             scaffolded = scaffold_draft_work(root, "work-002")
             self.assertTrue(scaffolded)
-            self.assertTrue((work_dir / folder / "tasks" / "task-2.1.md").is_file())
-            self.assertIn("In Progress", (work_dir / "INDEX.md").read_text(encoding="utf-8"))
+            self.assertFalse((work_dir / folder / "tasks" / "task-2.1.md").exists())
+            self.assertNotIn("In Progress", (work_dir / "INDEX.md").read_text(encoding="utf-8"))
 
     def test_parse_real_crochet_work_dir(self):
         crochet_dir = Path("/home/anu/git/crochet")

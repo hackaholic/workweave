@@ -5,10 +5,17 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+
+from workweave.views.review import render_review
+from workweave.controllers import lifecycle as lifecycle_controller
+from workweave.schemas.lifecycle import LifecycleError
+from workweave.repositories.lifecycle import find_work, safe_file
+from workweave.services import lifecycle
 
 from workweave.dashboard import generate_html_dashboard
 from workweave.parser import (
@@ -99,11 +106,18 @@ def create_handler_class(
                 self.validate_request_origin()
                 if route in ("/", "/index.html"):
                     self.respond(200, project_library(registry.root), "text/html; charset=utf-8")
+                elif route == "/api/lifecycle":
+                    query = parse_qs(parsed.query)
+                    self.respond(200, lifecycle_controller.get(registry, query.get("project", [None])[0], query.get("work", [None])[0]))
                 elif route == "/api/projects":
                     self.respond(200, {"projects": registry.list()})
                 elif route == "/api/folders":
                     query = parse_qs(parsed.query, keep_blank_values=True)
                     self.respond(200, registry.browse(query.get("path", [None])[0]))
+                elif re.fullmatch(r'/projects/[a-f0-9]{32}/work/work-\d+/review', route):
+                    parts = route.split('/')
+                    find_work(lifecycle_controller.selected_project(registry, parts[2]), parts[4])
+                    self.respond(200, render_review(parts[2], parts[4]), "text/html; charset=utf-8")
                 elif route.startswith("/projects/"):
                     project_id = route.removeprefix("/projects/")
                     state = self.workflow(project_id)
@@ -124,7 +138,7 @@ def create_handler_class(
                     self.respond(200, {"status": "ok", "service": "workweave"})
                 else:
                     raise ProjectError("Path not found.", 404, "not_found")
-            except ProjectError as exc:
+            except (ProjectError, LifecycleError) as exc:
                 self.error(exc, html)
             except Exception:
                 logger.exception("Failed to serve request")
@@ -136,6 +150,7 @@ def create_handler_class(
                 path = urlparse(self.path).path
                 valid_post_paths = {
                     "/api/projects",
+                    "/api/lifecycle",
                     "/api/comments",
                     "/api/subtasks/toggle",
                     "/api/subtasks/new",
@@ -163,6 +178,10 @@ def create_handler_class(
                 if not isinstance(payload, dict):
                     raise ProjectError("Request body must be a JSON object.")
 
+                if path == "/api/lifecycle":
+                    self.respond(200, lifecycle_controller.post(registry, payload))
+                    return
+
                 if path == "/api/projects":
                     if set(payload) - {"path", "name"}:
                         raise ProjectError("Expected path and optional name fields.")
@@ -181,6 +200,31 @@ def create_handler_class(
                         work_target = projects[0]["path"]
                     else:
                         raise ProjectError("Project ID is required.", 400, "project_required")
+
+                # Revalidate project mount and all work-local write targets.
+                work_target, _ = registry.resolve(work_target)
+                for key in ('work_id', 'subtask_id', 'title', 'text', 'author', 'owner', 'description'):
+                    if key in payload and not isinstance(payload[key], str):
+                        raise LifecycleError(f'{key} must be text.')
+                if path != '/api/work/new':
+                    folder = find_work(work_target, payload.get('work_id'))
+                    for filename in ('README.md', 'tasks.md', 'comments.md', 'notes.md', 'coordination.md', 'decisions.md', 'tasks'):
+                        safe_file(folder, filename)
+                if path == '/api/subtasks/toggle' and payload.get('title') is None:
+                    task_id = payload.get('subtask_id', '')
+                    if not task_id.startswith('planned-'):
+                        raise LifecycleError('Only approved plan tasks can be executed. Use Plan & review.', 'review_required', 409)
+                    data = lifecycle.toggle_task(folder, task_id[len('planned-'):], payload.get('completed'), payload.get('expected_version'))
+                    self.respond(200, {'status': 'ok', 'updated': True, 'lifecycle': data})
+                    return
+                if path in ('/api/subtasks/new', '/api/subtasks/toggle'):
+                    data = lifecycle.state(folder)
+                    if data.get('managed') and data['phase'] != 'Draft':
+                        raise LifecycleError('Task definition changes require Request changes and a new reviewed plan.', 'review_required', 409)
+                    if payload.get('completed') is not None:
+                        raise LifecycleError('Planning edits cannot also change completion.', 'review_required', 409)
+                    if payload.get('subtask_id', '').startswith('planned-'):
+                        raise LifecycleError('Revise planned task definitions in the next plan return.', 'review_required', 409)
 
                 if path == "/api/comments":
                     work_id = payload.get("work_id", "").strip()
@@ -213,7 +257,7 @@ def create_handler_class(
 
                 elif path == "/api/work/new":
                     title = payload.get("title", "").strip()
-                    description = payload.get("description", "").strip()
+                    description = payload.get("description", "")
                     is_draft = payload.get("is_draft", True)
                     owner = payload.get("owner", "Unassigned").strip() or "Unassigned"
                     if not title:
@@ -228,7 +272,7 @@ def create_handler_class(
                     ok = scaffold_draft_work(work_target, work_id)
                     self.respond(200, {"status": "ok", "scaffolded": ok})
 
-            except ProjectError as exc:
+            except (ProjectError, LifecycleError) as exc:
                 self.error(exc)
             except Exception:
                 logger.exception("Failed to process request")

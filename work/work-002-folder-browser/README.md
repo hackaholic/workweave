@@ -10,4 +10,4 @@ A read-only `/api/folders?path=...` endpoint lists child directories, parent nav
 Include folder browsing, selection, loading/error/empty states, keyboard support, boundary tests and Docker/browser verification. No file uploads, filesystem writes, native OS dialogs, or automatic project registration on selection.
 
 ## Status
-In Progress.
+Completed. See notes.md for verification evidence.

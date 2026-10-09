@@ -139,3 +139,26 @@ python3 -m unittest discover tests
 ## 📄 License
 
 MIT License.
+
+## Planning and review
+
+New requests start in **Draft**. Open **Plan & review** from a work item's dashboard. The original request is retained separately from later plan revisions in its `workflow.json`. No database or additional runtime dependency is needed.
+
+1. Expand **External-agent handoff instructions** and give the prompt to your chosen agent. WorkWeave does not launch an AI provider. The agent records pickup with its actual name, inspects authorized project context, and returns a structured plan through the API or the **Import plan return** field.
+2. Review the objective, scope, assumptions, questions, dependencies and acceptance checks alongside the original request. **Request changes** retains feedback and returns the work to Draft for a new planner pickup. Required questions must be resolved before approval.
+3. **Approve this plan** records the exact revision and reviewer. Work stays **Ready to implement** until an executor explicitly chooses **Claim and start implementation**.
+4. Complete approved subtasks in dependency order. **Mark work completed** requires all tasks completed plus verification evidence.
+
+**Prepare structure** only creates missing workflow files. It never rewrites existing files, assigns an agent, invokes AI, or starts implementation. Names are recorded local identities, not authenticated accounts. Review is a workflow gate in this trusted single-user app, not a security boundary against a local editor.
+
+Legacy work stays readable with its historical status and comments. **Enroll legacy work for review** previews the source text and preserves all existing Markdown files verbatim. It adds a Draft lifecycle without inventing earlier approval. Notes are used as the best available request source, otherwise README; the UI warns that historical text may not be the original request. There is no bulk migration or destructive reconciliation. Keep normal filesystem/Git backups of work folders.
+
+For managed work, the JSON snapshot is authoritative for lifecycle, approved tasks and revision-specific progress; Markdown is retained as historical/context material rather than rewritten into a second status source. The dashboard derives its view from the snapshot. Plans from prior revisions and progress remain in history. A revised plan starts with fresh progress for explicit re-verification.
+
+The API requires explicit project/work IDs, `expected_version`, and the acting identity for lifecycle actions. Fetch `/api/lifecycle?project=<id>&work=<id>` for the latest state and a complete return example. POST `/api/lifecycle` with `Content-Type: application/json` and `X-WorkWeave-Request: 1`. Supported actions: `enroll`, `accept_planning`, `submit_plan`, `cancel_planning`, `fail_planning`, `request_changes`, `approve`, `start`, `complete`. Plan return must match the active planner/run. HTTP bodies are limited to 16 KiB; history is limited to 4 MiB and errors preserve the previous snapshot.
+
+Lifecycle saves use atomic replacement and version conflicts; run only one WorkWeave server per writable workflow directory. A stopped server retains the active planning run, which can be resumed or cancelled after restart. No unattended timeout is implied in handoff mode. Invalid/corrupt metadata fails closed without overwriting it; restore a known-good snapshot before retrying.
+
+Changes to README, tasks.md, or task contracts after planning invalidate that context and require a fresh plan. Status/owner lines, checkbox progress, notes and comments do not invalidate it. This is a conservative work-file check, not a repository-wide source-code hash. Direct filesystem editing is outside API enforcement; agents must follow the project guidance.
+
+Comments remain available in every phase. Legacy task creation and renaming remain available as planning input; completion still requires enrollment, approval and explicit start. Draft task edits are planning context. Once a plan is submitted, change its tasks through a new plan revision. Completion updates are accepted only for tasks in the active approved plan. Static HTML exports support inspection, not lifecycle mutation.

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan and review — WorkWeave</title><style>$css</style></head>
+<body data-project="$project_id" data-work="$work_id"><main>
+<nav><a href="/projects/$project_id">← Project dashboard</a><a href="/">All projects</a></nav>
+<p class="brand">WORKWEAVE · PLAN & REVIEW</p><h1>Review before implementation</h1>
+<p id="phase" class="badge">Loading…</p><p id="status" role="status" aria-live="polite"></p>
+<button id="reload" class="secondary">Reload latest state</button>
+<section id="controls" hidden>
+<p id="notice"></p>
+<p class="muted">External-agent handoff mode. No AI provider is connected or launched by this page. Planner and reviewer names are recorded identities in this personal local app, not authenticated accounts.</p>
+<div class="identity"><label for="actor">Your name / acting agent</label><input id="actor" maxlength="120" placeholder="Enter the actual reviewer, planner or executor name" autocomplete="off"></div>
+<div class="actions" id="actions"></div>
+<label for="feedback">Review feedback or completion evidence</label><textarea id="feedback" rows="3" placeholder="Explain changes requested, or record verification results before completion."></textarea>
+<details><summary>External-agent handoff instructions</summary><p>Give these instructions to your chosen agent. Opening this section does not claim work or start an AI run.</p><textarea id="handoff" rows="12" readonly aria-label="Handoff instructions"></textarea></details>
+<section id="import-section" hidden><h2>Import plan return</h2><p>Paste the agent’s JSON return envelope with matching planner, run ID, expected version and structured plan. Importing submits a plan for your review; it does not approve or implement it.</p>
+<label for="plan-return">Agent return JSON</label><textarea id="plan-return" rows="10" spellcheck="false"></textarea><button id="import">Submit returned plan for review</button></section>
+</section>
+<div class="columns"><section><h2>Original request</h2><pre id="request">Loading…</pre><p id="legacy-notice" class="muted"></p></section>
+<section><h2>Proposed plan</h2><div id="plan"><p>No plan submitted yet.</p></div></section></div>
+<details><summary>Earlier plan revisions and lifecycle history</summary><div id="history"></div></details>
+</main><script>$js</script></body></html>

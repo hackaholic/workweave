@@ -60,6 +60,7 @@ class WorkItem:
     comments: list[Comment] = field(default_factory=list)
     notes: str = ""
     is_draft: bool = False
+    lifecycle: dict = field(default_factory=dict)
     total_subtasks: int = 0
     completed_subtasks: int = 0
     progress_percent: int = 0
@@ -344,6 +345,26 @@ def parse_work_directory(target_path: Path | str, project_title: str | None = No
 
             is_draft = "draft" in status.lower() or "[draft]" in title.lower() or "(draft)" in title.lower() or (readme_path.is_file() and "[draft]" in readme_text.lower())
 
+            from workweave.services.lifecycle import state as lifecycle_state
+            from workweave.schemas.lifecycle import STATUS, LifecycleError
+            try:
+                lifecycle = lifecycle_state(folder)
+            except (LifecycleError, OSError) as exc:
+                lifecycle = {"phase": "Review required", "managed": True, "approval_valid": False, "error": str(exc)}
+            if lifecycle.get('managed'):
+                status = STATUS.get(lifecycle['phase'], 'Blocked')
+                if lifecycle.get('context_changed') and lifecycle['phase'] in ('Ready to implement', 'In progress'):
+                    status = 'Blocked'
+                is_draft = lifecycle['phase'] == 'Draft'
+                title = re.sub(r'^\[Draft\]\s*', '', title, flags=re.IGNORECASE)
+                current_owner = (lifecycle.get('executor') or {}).get('name', '') or (lifecycle.get('run') or {}).get('planner', '')
+                if lifecycle.get('plans'):
+                    latest = lifecycle['plans'][-1]
+                    progress = lifecycle.get('progress', {}).get(str(latest['revision']), {})
+                    subtasks = [SubTask(id='planned-' + t['id'], title=t['title'], completed=progress.get(t['id'], False),
+                                        owner=current_owner, comments=[c for c in comments if c.subtask_id == 'planned-' + t['id']])
+                                for t in latest['content']['tasks']]
+
             total_sub = len(subtasks)
             completed_sub = sum(1 for st in subtasks if st.completed)
             progress_pct = round((completed_sub / total_sub * 100)) if total_sub > 0 else (100 if status == "Completed" else 0)
@@ -371,6 +392,7 @@ def parse_work_directory(target_path: Path | str, project_title: str | None = No
                     comments=comments,
                     notes=notes,
                     is_draft=is_draft,
+                    lifecycle=lifecycle,
                     total_subtasks=total_sub,
                     completed_subtasks=completed_sub,
                     progress_percent=progress_pct,
@@ -530,15 +552,21 @@ def create_subtask(
         tasks_file.write_text(f"# Tasks\n\n## Pending\n\n{new_line}\n", encoding="utf-8")
     else:
         content = tasks_file.read_text(encoding="utf-8")
-        # Try to append under ## Pending or ## In Progress or at the end
+        # Try to append under ## Pending or ## In Progress or create ## Pending before ## Completed
         if "## Pending" in content:
             parts = content.split("## Pending", 1)
-            content = f"{parts[0]}## Pending\n\n{new_line}\n{parts[1].lstrip()}"
+            pending_body = re.sub(r"^\s*None\.\s*\n", "", parts[1].lstrip())
+            content = f"{parts[0]}## Pending\n\n{new_line}\n{pending_body}"
         elif "## In Progress" in content:
             parts = content.split("## In Progress", 1)
-            content = f"{parts[0]}## In Progress\n\n{new_line}\n{parts[1].lstrip()}"
+            prog_body = re.sub(r"^\s*None\.\s*\n", "", parts[1].lstrip())
+            content = f"{parts[0]}## In Progress\n\n{new_line}\n{prog_body}"
         else:
-            content = f"{content.rstrip()}\n\n{new_line}\n"
+            if "## Completed" in content:
+                parts = content.split("## Completed", 1)
+                content = f"{parts[0]}## Pending\n\n{new_line}\n\n## Completed{parts[1]}"
+            else:
+                content = f"{content.rstrip()}\n\n## Pending\n\n{new_line}\n"
         tasks_file.write_text(content, encoding="utf-8")
 
     st = parse_subtask_line(new_line, target_folder, project_root)
@@ -562,6 +590,9 @@ def create_work_item(
     work_dir, _ = resolve_work_directory(target_path)
     work_dir.mkdir(parents=True, exist_ok=True)
 
+    from workweave.repositories.lifecycle import safe_file
+    safe_file(work_dir, 'INDEX.md')
+
     # Find highest number
     max_num = 0
     for d in work_dir.iterdir():
@@ -580,14 +611,16 @@ def create_work_item(
     work_folder.mkdir(parents=True, exist_ok=True)
     (work_folder / "tasks").mkdir(exist_ok=True)
 
-    # Status: Draft if user created without AI scaffolding, else Pending
+    # Every newly submitted request needs planning and review.
+    is_draft = True
+    owner = "Unassigned"
     status = "Pending [Draft]" if is_draft else "Pending"
     clean_title = f"[Draft] {title.strip()}" if is_draft and not title.lower().startswith("[draft]") else title.strip()
 
     # Create README.md
     readme_content = f"""# Work {num_str} — {title.strip()}
 
-{'**[User Draft — Needs AI Scaffolding]**' if is_draft else ''}
+{'**[User Draft — Needs Planning and Review]**' if is_draft else ''}
 
 ## Goal
 {description.strip() or 'User-submitted task backlog item.'}
@@ -602,7 +635,7 @@ def create_work_item(
 
 ## Current handoffs
 - Current Owner: {owner}
-- Status: {'Draft / Needs Scaffolding' if is_draft else 'Pending'}
+- Status: {'Draft / Needs Planning' if is_draft else 'Pending'}
 - Active Task: None
 
 ## Return protocol
@@ -641,128 +674,13 @@ None.
         existing_index = index_file.read_text(encoding="utf-8")
         index_file.write_text(f"{existing_index.rstrip()}\n{index_entry}", encoding="utf-8")
 
+    from workweave.services.lifecycle import initialize
+    initialize(work_folder, f"{title}\n\n{description}")
     return folder_name
 
 
 def scaffold_draft_work(target_path: Path | str, work_id: str) -> bool:
-    """Scaffold a draft user work package into formal multi-agent structure.
-
-    Reads raw user notes and README, generates structured subtasks and contract templates,
-    and updates status to 'In Progress' / 'Pending'.
-    """
-    work_dir, _ = resolve_work_directory(target_path)
-    target_folder = None
-    for d in work_dir.iterdir():
-        if d.is_dir() and (d.name == work_id or d.name.startswith(f"{work_id}-") or d.name.startswith(f"{work_id}_")):
-            target_folder = d
-            break
-
-    if not target_folder:
-        raise ValueError(f"Work item folder for '{work_id}' not found in {work_dir}")
-
-    # Extract number
-    m = re.match(r"work-(\d+)", target_folder.name)
-    num_str = m.group(1) if m else "001"
-    num = int(num_str)
-
-    readme_file = target_folder / "README.md"
-    raw_text = readme_file.read_text(encoding="utf-8") if readme_file.is_file() else ""
-    goal_match = re.search(r"##\s+(?:Goal|Objective)\s*\n+([^#\n][^\n]+)", raw_text)
-    goal = goal_match.group(1).strip() if goal_match else "Implement requested requirements."
-
-    # Extract clean title from README or folder name
-    first_line = raw_text.splitlines()[0] if raw_text.splitlines() else target_folder.name
-    clean_title = re.sub(r"^#\s*Work\s*\d+\s*[—–-]\s*", "", first_line).replace("[Draft]", "").strip()
-    if not clean_title:
-        clean_title = target_folder.name.replace("-", " ").title()
-
-    # Write formal README.md
-    formal_readme = f"""# Work {num_str} — {clean_title}
-
-## Goal
-{goal}
-
-## Scope
-- Core architecture and implementation of {clean_title}
-- Unit and integration tests
-- Verification and documentation
-
-## Non-Goals
-- Unrelated feature refactoring
-
-## Architecture & Context
-Formally scaffolded from user requirements. Work contracts are maintained in `tasks/`.
-"""
-    readme_file.write_text(formal_readme.strip() + "\n", encoding="utf-8")
-
-    # Generate task contracts in tasks/
-    tasks_dir = target_folder / "tasks"
-    tasks_dir.mkdir(exist_ok=True)
-    c1_file = tasks_dir / f"task-{num}.1.md"
-    c1_content = f"""# Task Contract: {num}.1 Implementation Plan & Core Setup
-
-**Owner:** Antigravity
-**Status:** In Progress
-
-## Objective
-Design architecture and establish core implementation for {clean_title}.
-
-## Scope
-- In scope:
-  - Technical design and data schema
-  - Implementation of primary modules
-- Out of scope:
-  - Third-party external deployments
-
-## Acceptance Criteria
-- [ ] Core module functions as specified
-- [ ] Unit tests pass cleanly
-"""
-    c1_file.write_text(c1_content.strip() + "\n", encoding="utf-8")
-
-    # Generate tasks.md with contract link
-    tasks_file = target_folder / "tasks.md"
-    tasks_content = f"""# Work {num_str} Tasks
-
-## In Progress
-- [ ] Antigravity: {num}.1 Implementation and core setup [contract](tasks/task-{num}.1.md)
-
-## Pending
-- [ ] {num}.2 Automated test coverage and regression checks
-- [ ] {num}.3 Final review and documentation signoff
-
-## Completed
-None.
-"""
-    tasks_file.write_text(tasks_content.strip() + "\n", encoding="utf-8")
-
-    # Update coordination.md
-    coord_file = target_folder / "coordination.md"
-    coord_content = f"""# Work {num_str} Coordination
-
-## Current handoffs
-- Current Owner: Antigravity
-- Status: Active
-- Active Task: tasks/task-{num}.1.md
-
-## Return protocol
-Update task contracts, tasks.md, and notes.md before returning or handing off.
-"""
-    coord_file.write_text(coord_content.strip() + "\n", encoding="utf-8")
-
-    # Update INDEX.md to remove [Draft] and set to 'In Progress'
-    index_file = work_dir / "INDEX.md"
-    if index_file.is_file():
-        index_lines = index_file.read_text(encoding="utf-8").splitlines()
-        new_index_lines = []
-        for line in index_lines:
-            if target_folder.name in line or f"Work {int(num_str)}" in line:
-                # Replace with clean title and In Progress
-                new_line = f"- **Work {num_str} — {clean_title}** · In Progress · [work folder]({target_folder.name}/)"
-                new_index_lines.append(new_line)
-            else:
-                new_index_lines.append(line)
-        index_file.write_text("\n".join(new_index_lines) + "\n", encoding="utf-8")
-
-    return True
-
+    """Prepare missing structure only; this does not invoke AI or begin work."""
+    from workweave.repositories.lifecycle import find_work
+    from workweave.services.preparation import prepare
+    return prepare(find_work(target_path, work_id))
