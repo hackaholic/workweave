@@ -54,7 +54,7 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
   {navigation}
   <!-- Header Banner -->
   <header class="bg-[var(--card)] border-b border-[var(--border)] sticky top-0 z-30 shadow-md">
-    <div class="max-w-7xl mx-auto px-4 py-3 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-4">
+    <div class="w-full px-4 py-3 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-4">
       <div class="flex items-center space-x-3">
         <div class="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-inner">
           ⚡
@@ -91,7 +91,7 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
 
   <!-- Metrics Bar (Clickable KPI Filter Cards) -->
   <div class="bg-[var(--card)]/50 border-b border-[var(--border)] py-2.5">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-center">
+    <div class="w-full px-4 sm:px-6 lg:px-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-center">
       <button onclick="setFilter('ALL')" id="kpi-ALL" class="p-2 rounded-lg bg-[var(--card)] hover:bg-[var(--card-hover)] border border-[var(--border)] transition cursor-pointer text-center group focus:outline-none focus:ring-1 focus:ring-indigo-500">
         <div class="text-xs text-[var(--muted-foreground)] group-hover:text-white">Total Items</div>
         <div class="text-lg font-bold text-white">{state.total_work_items}</div>
@@ -120,7 +120,7 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
   </div>
 
   <!-- Main Container -->
-  <main class="max-w-7xl mx-auto px-4 py-5 sm:px-6 lg:px-8 flex-1 flex flex-col w-full">
+  <main class="w-full px-4 py-5 sm:px-6 lg:px-8 flex-1 flex flex-col">
     
     <!-- Controls Toolbar (Search & Filter Pills & New Work Item) -->
     <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 mb-5">
@@ -166,8 +166,8 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
     <!-- 2-Column Responsive Layout -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-0">
       
-      <!-- Left Column: Work Items List (5 cols) -->
-      <div class="lg:col-span-5 flex flex-col h-[750px] bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
+      <!-- Left Column: Work Items List (4 cols) -->
+      <div class="lg:col-span-4 min-w-0 flex flex-col h-[750px] bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
         <div class="px-4 py-3 border-b border-[var(--border)] bg-gray-900/40 flex items-center justify-between">
           <span class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Work Items</span>
           <span id="items-count-badge" class="text-xs bg-gray-800 px-2 py-0.5 rounded text-gray-300">Showing {state.total_work_items}</span>
@@ -177,8 +177,8 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
         </div>
       </div>
 
-      <!-- Right Column: Detail Pane (7 cols) -->
-      <div class="lg:col-span-7 flex flex-col h-[750px] bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
+      <!-- Right Column: Detail Pane (8 cols) -->
+      <div class="lg:col-span-8 min-w-0 flex flex-col h-[750px] bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
         <div id="detail-header" class="px-5 py-4 border-b border-[var(--border)] bg-gray-900/40 flex items-center justify-between">
           <!-- Dynamically populated header -->
         </div>
