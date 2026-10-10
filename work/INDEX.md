@@ -5,3 +5,6 @@
 - **Work 003 — Interactive KPI Filtering, Comments, and Work/Subtask Scaffolding** · Completed · [work folder](work-003-interactive-workflow/)
 - **Work 004 — Modular architecture, templates and UI assets** · Pending · [work folder](work-004-modular-architecture/)
 - **Work 005 — AI planning and review before implementation** · Completed · [work folder](work-005-ai-planning-review/)
+- **Work 006 — Subtask blocker visibility** · Completed · [work folder](work-006-subtask-blockers/)
+- **Work 007 — Shared workflow and parser compatibility** · Completed · [work folder](work-007-workflow-compatibility/)
+- **Work 008 — Responsive detail header** · Completed · [work folder](work-008-detail-header/)

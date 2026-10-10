@@ -1,0 +1,80 @@
+--- a/workflow-scaffold/templates/TASK_TEMPLATE.md
++++ b/workflow-scaffold/templates/TASK_TEMPLATE.md
+@@ -1,5 +1,6 @@
+ # Task <work-id>.<task-id> — <short title>
+ 
++**Task ID:** <work-id>.<task-id>
+ **Owner:** <agent/person>
+ **Status:** Pending
+ **Work item:** <Work NNN>
+@@ -19,7 +20,10 @@
+ 
+ ## Dependencies and relevant files
+ 
+-- Depends on:
++- Depends on: None
++- Blocked by: None
++- Blocker reason: None
++- Next action: None
+ - Inspect/edit:
+ 
+ ## Test cases (define before implementation)
+--- a/workflow-scaffold/templates/work-folder/tasks.md
++++ b/workflow-scaffold/templates/work-folder/tasks.md
+@@ -8,6 +8,10 @@
+ 
+ - [ ] <NNN>.2 <Second task title>
+ 
++## Blocked
++
++None.
++
+ ## Completed
+ 
+ None.
+--- a/workflow-scaffold/templates/work-folder/coordination.md
++++ b/workflow-scaffold/templates/work-folder/coordination.md
+@@ -7,6 +7,7 @@
+ - Current Owner: <agent/person/unassigned>
+ - Status: <Active / Blocked / Returned / Ready for Review>
+ - Active Task: <None / Link to tasks/task-XXX.md>
++- Next Action: <None / concrete next action and responsible agent/person>
+ 
+ ## Return protocol
+ 
+--- /dev/null
++++ b/workflow-scaffold/references/workflow-format.md
+@@ -0,0 +1,11 @@
++# Workflow format compatibility
++
++Keep the existing work/ tree and Markdown filenames. Apply these conventions to new records or the specific task being edited; do not mass-migrate existing projects.
++
++- Task IDs (for example 1.9.2) remain stable when titles, owners or statuses change. Use the same ID in the checklist, contract heading, and optional **Task ID:** field. Existing records without the field remain valid; never renumber them automatically.
++- Task contract **Owner:** accepts any agent/person name. Checklist owner labels are summaries, not a fixed set of allowed agents.
++- In the Markdown workflow, tasks.md sections define task state: Pending, In Progress, Blocked, Completed. Completed entries are checked; other entries are unchecked. Mirror status in the linked contract when transitioning. A blocked child does not automatically make the entire work Blocked.
++- INDEX.md records whole-work status. coordination.md summarizes the current handoff using Current Owner, Status, Active Task and optional Next Action; it does not override every task's status. Preserve existing equivalent bold-field layouts. Report conflicts rather than silently rewriting files or assuming missing data means no blockers.
++- Depends on lists prerequisite task IDs (use a relative contract link for cross-work dependencies). Blocked by identifies current unmet prerequisites; Blocker reason and Next action explain the wait. Use None only when confirmed absent; use Unknown when not established. Existing prose remains valid and must not be converted into inferred dependency edges without evidence.
++- Completion of a prerequisite makes a dependent task eligible for reassessment, not automatically In Progress or Completed. Record actual pickup and handoff evidence.
++- A project may already use a documented review/approval service such as workflow.json. Follow that project's transition mechanism and source-of-truth rules; do not fabricate approval or edit managed lifecycle metadata directly. Do not introduce JSON, a database or a new review state machine into projects that use only this Markdown scaffold.
+--- a/workflow-scaffold/SKILL.md
++++ b/workflow-scaffold/SKILL.md
+@@ -21,7 +21,7 @@
+        - `decisions.md`: Architecture Decision Records (ADRs).
+        - `notes.md`: Execution evidence and test logs.
+        - `tasks/`: Directory for atomic subtask contracts.
+-   - Use templates from [`templates/`](templates/).
++   - Use templates from [`templates/`](templates/) and preserve the backward-compatible [workflow format](references/workflow-format.md).
+ 
+ 2. **Migrate Existing Project to `work/`**:
+    - Scan existing task sources: `README.md`, `TODO.md`, `docs/`, or open issues.
+--- a/workflow-coordinator/SKILL.md
++++ b/workflow-coordinator/SKILL.md
+@@ -6,6 +6,8 @@
+ # Workflow Coordinator
+ 
+ Manage task lifecycles, subtask contracts, and agent/developer handoffs using the structured `work/` tree. Applies universally to any AI agent (Claude, GPT, Gemini, DeepSeek, etc.).
++
++When creating or updating records, follow the shared [workflow format](../workflow-scaffold/references/workflow-format.md); preserve existing project conventions and any documented approval mechanism.
+ 
+ ## Core Directives
+ 

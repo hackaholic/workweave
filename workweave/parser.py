@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import re
+
+from workweave import workflow_format as fmt
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,6 +22,13 @@ class TaskContract:
     scope_in: list[str] = field(default_factory=list)
     scope_out: list[str] = field(default_factory=list)
     acceptance_checks: list[str] = field(default_factory=list)
+    task_id: str = ""
+    depends_on: str = ""
+    dependencies: list[str] = field(default_factory=list)
+    blocked_by: str = ""
+    blocker_reason: str = ""
+    next_action: str = ""
+    warnings: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -39,6 +48,16 @@ class SubTask:
     owner: str = ""
     contract_path: str = ""
     contract_title: str = ""
+    task_id: str = ""
+    depends_on: str = ""
+    dependencies: list[str] = field(default_factory=list)
+    blocked_by: str = ""
+    blocker_reason: str = ""
+    next_action: str = ""
+    warnings: list[str] = field(default_factory=list)
+    section_status: str = ""
+    resolved_dependencies: list[dict] = field(default_factory=list)
+    status: str = "Pending"
     comments: list[Comment] = field(default_factory=list)
 
 
@@ -53,6 +72,9 @@ class WorkItem:
     goal: str = ""
     current_owner: str = ""
     active_handoffs: str = ""
+    active_task: str = ""
+    next_action: str = ""
+    warnings: list[str] = field(default_factory=list)
     handoff_state: str = ""
     subtasks: list[SubTask] = field(default_factory=list)
     decisions: list[dict[str, str]] = field(default_factory=list)
@@ -116,6 +138,8 @@ def parse_subtask_line(line: str, work_folder: Path, project_root: Path) -> SubT
 
     completed = match.group(1).lower() == "x"
     raw_text = match.group(2).strip()
+    stable = re.search(r'<!-- ww-id:([A-Za-z0-9_-]+) -->', raw_text)
+    raw_text = re.sub(r'\s*<!-- ww-id:[A-Za-z0-9_-]+ -->', '', raw_text)
 
     contract_path = ""
     contract_title = ""
@@ -129,17 +153,17 @@ def parse_subtask_line(line: str, work_folder: Path, project_root: Path) -> SubT
         except ValueError:
             contract_path = rel_contract
 
-    # Extract owner if specified (e.g. Gemini, Codex, Claude, GPT, Owner)
     owner = ""
-    owner_match = re.search(r"(?:^|\s)(Gemini|Codex|Claude|GPT|Owner|Antigravity)(?:\s*\+\s*(Gemini|Codex|Claude|GPT|Owner|Antigravity))?:", raw_text)
+    owner_match = re.match(r'^(?:' + fmt.TASK_ID + r'\s+)?([^:\[\]<>]+):\s+', raw_text)
     if owner_match:
-        owner = owner_match.group(0).rstrip(":")
+        owner = owner_match.group(1).strip()
 
     display_title = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", raw_text).strip()
     subtask_id = re.sub(r"[^a-zA-Z0-9_-]", "-", display_title[:32]).strip("-")
 
     return SubTask(
-        id=subtask_id,
+        id=stable.group(1) if stable else subtask_id,
+        task_id=fmt.semantic_id(display_title),
         title=display_title,
         completed=completed,
         owner=owner,
@@ -162,6 +186,13 @@ def parse_task_contract(contract_file: Path, project_root: Path) -> TaskContract
         return contract
 
     content = contract_file.read_text(encoding="utf-8", errors="replace")
+    meta, contract.warnings = fmt.fields(content)
+    contract.task_id = meta.get('task id', '')
+    contract.depends_on = meta.get('depends on', '')
+    contract.dependencies = fmt.dependencies(contract.depends_on)
+    contract.blocked_by = meta.get('blocked by', '')
+    contract.blocker_reason = meta.get('blocker reason', '')
+    contract.next_action = meta.get('next action', '')
     lines = content.splitlines()
 
     current_section = ""
@@ -205,6 +236,9 @@ def parse_task_contract(contract_file: Path, project_root: Path) -> TaskContract
             if stripped.startswith("- [ ]") or stripped.startswith("- [x]"):
                 contract.acceptance_checks.append(stripped)
 
+    contract.owner = meta.get('owner', contract.owner)
+    contract.status = meta.get('status', contract.status)
+    contract.task_id = contract.task_id or fmt.semantic_id(contract.title)
     return contract
 
 
@@ -277,26 +311,34 @@ def parse_work_directory(target_path: Path | str, project_title: str | None = No
             current_owner = ""
             active_handoffs = ""
             handoff_state = ""
+            active_task = next_action = ""
+            warnings = []
             coord_path = folder / "coordination.md"
             if coord_path.is_file():
-                coord_text = coord_path.read_text(encoding="utf-8", errors="replace")
-                owner_m = re.search(r"\*\*Current owner:\*\*\s*([^\n]+)", coord_text)
-                if owner_m:
-                    current_owner = owner_m.group(1).strip()
-                handoff_m = re.search(r"\*\*Active cross-agent handoffs:\*\*\s*([^\n]+)", coord_text)
-                if handoff_m:
-                    active_handoffs = handoff_m.group(1).strip()
-                state_m = re.search(r"\*\*Handoff state:\*\*\s*([^\n]+)", coord_text)
-                if state_m:
-                    handoff_state = state_m.group(1).strip()
+                meta, warnings = fmt.fields(coord_path.read_text(encoding='utf-8', errors='replace'))
+                current_owner = meta.get('current owner', '')
+                active_handoffs = meta.get('active cross-agent handoffs', '')
+                handoff_state = meta.get('status', meta.get('handoff state', ''))
+                active_task = meta.get('active task', '')
+                next_action = meta.get('next action', '')
+                if meta.get('status') and meta.get('handoff state') and meta['status'] != meta['handoff state']:
+                    warnings.append('Coordination status and handoff state disagree; Status retained.')
 
             subtasks: list[SubTask] = []
             tasks_path = folder / "tasks.md"
             if tasks_path.is_file():
                 tasks_text = tasks_path.read_text(encoding="utf-8", errors="replace")
+                section_status = ''
                 for line in tasks_text.splitlines():
+                    heading = re.match(r'^##\s+(.+?)\s*#*$', line)
+                    if heading:
+                        section_status = fmt.STATUSES.get(heading.group(1).strip().lower(), '')
                     subtask = parse_subtask_line(line, folder, project_root)
                     if subtask:
+                        subtask.section_status = section_status
+                        subtask.status = 'Completed' if subtask.completed else (section_status if section_status != 'Completed' else 'Pending') or 'Pending'
+                        if section_status == 'Completed' and not subtask.completed:
+                            subtask.warnings.append('Unchecked task in Completed section; kept unfinished.')
                         subtasks.append(subtask)
 
             decisions: list[dict[str, str]] = []
@@ -316,6 +358,8 @@ def parse_work_directory(target_path: Path | str, project_title: str | None = No
                 for c_file in sorted(tasks_subdir.glob("*.md")):
                     if c_file.name != "README.md":
                         contracts.append(parse_task_contract(c_file, project_root))
+
+            fmt.enrich(subtasks, contracts, folder, project_root)
 
             comments: list[Comment] = []
             comments_path = folder / "comments.md"
@@ -361,10 +405,17 @@ def parse_work_directory(target_path: Path | str, project_title: str | None = No
                 if lifecycle.get('plans'):
                     latest = lifecycle['plans'][-1]
                     progress = lifecycle.get('progress', {}).get(str(latest['revision']), {})
-                    subtasks = [SubTask(id='planned-' + t['id'], title=t['title'], completed=progress.get(t['id'], False),
-                                        owner=current_owner, comments=[c for c in comments if c.subtask_id == 'planned-' + t['id']])
+                    subtasks = [SubTask(id='planned-' + t['id'], task_id=t['id'], title=t['title'], completed=progress.get(t['id'], False),
+                                        depends_on=', '.join(t['dependencies']) or 'None',
+                                        status='Completed' if progress.get(t['id'], False) else 'Pending', owner=current_owner, comments=[c for c in comments if c.subtask_id == 'planned-' + t['id']])
                                 for t in latest['content']['tasks']]
 
+            if lifecycle.get('managed') and lifecycle.get('plans'):
+                planned_by_id = {task.task_id: task for task in subtasks}
+                for task, planned in zip(subtasks, lifecycle['plans'][-1]['content']['tasks']):
+                    task.resolved_dependencies = [dict(task_id=dep, work_id=item_id,
+                        title=planned_by_id[dep].title, completed=planned_by_id[dep].completed)
+                        for dep in planned['dependencies']]
             total_sub = len(subtasks)
             completed_sub = sum(1 for st in subtasks if st.completed)
             progress_pct = round((completed_sub / total_sub * 100)) if total_sub > 0 else (100 if status == "Completed" else 0)
@@ -385,6 +436,7 @@ def parse_work_directory(target_path: Path | str, project_title: str | None = No
                     goal=goal,
                     current_owner=current_owner,
                     active_handoffs=active_handoffs,
+                    active_task=active_task, next_action=next_action, warnings=warnings,
                     handoff_state=handoff_state,
                     subtasks=subtasks,
                     decisions=decisions,
@@ -399,11 +451,12 @@ def parse_work_directory(target_path: Path | str, project_title: str | None = No
                 )
             )
 
+    fmt.check_references(work_items)
     total_items = len(work_items)
     completed_items = sum(1 for item in work_items if item.status == "Completed")
     in_progress_items = sum(1 for item in work_items if item.status == "In Progress")
     pending_items = sum(1 for item in work_items if item.status == "Pending")
-    blocked_items = sum(1 for item in work_items if item.status == "Blocked")
+    blocked_items = sum(1 for item in work_items if item.status == "Blocked" or any(st.status == "Blocked" for st in item.subtasks))
 
     global_total_sub = sum(item.total_subtasks for item in work_items)
     global_completed_sub = sum(item.completed_subtasks for item in work_items)
@@ -492,36 +545,47 @@ def update_subtask(
     if not tasks_file.is_file():
         raise ValueError(f"tasks.md not found in {target_folder}")
 
-    lines = tasks_file.read_text(encoding="utf-8").splitlines()
-    updated = False
-    new_lines = []
-
+    with tasks_file.open(encoding="utf-8", newline="") as source:
+        original = source.read()
+    lines = original.splitlines(keepends=True)
     clean_sub_id = re.sub(r"[^a-zA-Z0-9_-]", "-", subtask_id.strip()).strip("-").lower()
-    for line in lines:
+    candidates = []
+    for index, line in enumerate(lines):
         st = parse_subtask_line(line, target_folder, project_root)
-        if st and (st.id == subtask_id or st.id.lower() == clean_sub_id or re.sub(r"[^a-zA-Z0-9_-]", "-", st.title[:32]).strip("-").lower() == clean_sub_id):
-            # Found the target line
-            curr_done = completed if completed is not None else st.completed
-            check_char = "x" if curr_done else " "
-            
-            # Format title
-            title_to_use = new_title.strip() if new_title is not None else st.title
-            
-            # Preserve contract link if present in original line
-            link_match = re.search(r"(\[[^\]]+\]\([^)]+\.md\))", line)
-            contract_suffix = f" {link_match.group(1)}" if link_match and link_match.group(1) not in title_to_use else ""
-            
-            # Preserve owner prefix if present
-            owner_prefix = f"{st.owner}: " if st.owner and not title_to_use.startswith(f"{st.owner}:") else ""
-
-            new_line = f"- [{check_char}] {owner_prefix}{title_to_use}{contract_suffix}".strip()
-            new_lines.append(new_line)
-            updated = True
-        else:
-            new_lines.append(line)
-
+        if st and (st.id == subtask_id or st.id.lower() == clean_sub_id):
+            candidates.append((index, st))
+    if len(candidates) > 1:
+        from workweave.schemas.lifecycle import LifecycleError
+        raise LifecycleError('Ambiguous task identity; resolve duplicate task entries before editing.', 'ambiguous_task', 409)
+    updated = bool(candidates)
     if updated:
-        tasks_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+        index, st = candidates[0]
+        line = lines[index]
+        if new_title is None:
+            lines[index] = re.sub(r'^(\s*[-*]\s+\[)[ xX](\])',
+                                  lambda m: m[1] + ('x' if completed else ' ') + m[2], line)
+        else:
+            title = new_title.strip()
+            from workweave.schemas.lifecycle import LifecycleError
+            if '\n' in title or '\r' in title or '<!-- ww-id:' in title:
+                raise LifecycleError('Task titles must be one line without identity metadata.')
+            new_id = fmt.semantic_id(title)
+            if st.task_id and new_id and new_id != st.task_id:
+                raise LifecycleError('Renaming cannot change the task ID.')
+            if st.task_id and not new_id:
+                title = st.task_id + ' ' + title
+            owner_pattern = r'^(?:' + fmt.TASK_ID + r'\s+)?[^:\[\]<>]+:\s+'
+            if st.owner and not re.match(owner_pattern, title):
+                title = (st.task_id + ' ' if st.task_id else '') + st.owner + ': ' + (title[len(st.task_id):].lstrip() if st.task_id else title)
+            link = re.search(r'\[[^\]]+\]\([^)]+\.md\)', line)
+            if link and link.group() not in title:
+                title += ' ' + link.group()
+            prefix = re.match(r'^(\s*[-*]\s+)\[[ xX]\]\s*', line).group(1)
+            newline = '\r\n' if line.endswith('\r\n') else '\n' if line.endswith('\n') else ''
+            done = st.completed if completed is None else completed
+            lines[index] = f"{prefix}[{'x' if done else ' '}] {title} <!-- ww-id:{st.id} -->{newline}"
+        with tasks_file.open('w', encoding='utf-8', newline='') as output:
+            output.write(''.join(lines))
 
     return updated
 

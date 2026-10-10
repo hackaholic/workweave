@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from importlib.resources import files
 import json
 from html import escape
 from dataclasses import asdict
@@ -45,6 +46,7 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
       background: rgba(156, 163, 175, 0.3);
       border-radius: 3px;
     }}
+    {files('workweave').joinpath('static/detail-header.css').read_text(encoding='utf-8')}
   </style>
 </head>
 <body class="bg-[var(--background)] text-[var(--foreground)] min-h-screen antialiased flex flex-col">
@@ -107,7 +109,7 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
         <div class="text-lg font-bold text-amber-300">{state.pending_items}</div>
       </button>
       <button onclick="setFilter('BLOCKED')" id="kpi-BLOCKED" class="p-2 rounded-lg bg-rose-950/40 hover:bg-rose-900/50 border border-rose-800/40 transition cursor-pointer text-center group focus:outline-none focus:ring-1 focus:ring-rose-500">
-        <div class="text-xs text-rose-400">Blocked</div>
+        <div class="text-xs text-rose-400" title="Work items blocked or containing blocked subtasks">Blocked</div>
         <div class="text-lg font-bold text-rose-300">{state.blocked_items}</div>
       </button>
       <div class="p-2 rounded-lg bg-gray-900 border border-[var(--border)] col-span-2 sm:col-span-1">
@@ -317,6 +319,8 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
     let searchQuery = '';
     let selectedItemId = DATA.items.length > 0 ? DATA.items[0].id : null;
 
+    {files('workweave').joinpath('static/workflow-metadata.js').read_text(encoding='utf-8')}
+
     function getStatusBadge(status) {{
       switch(status) {{
         case 'Completed':
@@ -347,7 +351,7 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
         if (currentFilter === 'IN_PROGRESS' && item.status !== 'In Progress') return false;
         if (currentFilter === 'COMPLETED' && item.status !== 'Completed') return false;
         if (currentFilter === 'PENDING' && item.status !== 'Pending') return false;
-        if (currentFilter === 'BLOCKED' && item.status !== 'Blocked') return false;
+        if (currentFilter === 'BLOCKED' && item.status !== 'Blocked' && !item.subtasks.some(st => st.status === 'Blocked')) return false;
 
         if (searchQuery) {{
           const q = searchQuery.toLowerCase();
@@ -432,12 +436,12 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
 
       // Render Header
       headerEl.innerHTML = `
-        <div class="flex items-center gap-3">
-          <span class="text-xs font-mono px-2 py-0.5 rounded bg-gray-800 text-gray-300 font-bold">#${{String(item.number).padStart(3, '0')}}</span>
-          <h2 class="text-sm font-bold text-white truncate max-w-sm sm:max-w-md">${{escapeHtml(item.title)}}</h2>
+        <div class="detail-heading">
+          <span class="detail-number text-xs font-mono px-2 py-0.5 rounded bg-gray-800 text-gray-300 font-bold">#${{String(item.number).padStart(3, '0')}}</span>
+          <h2 class="detail-title text-sm font-bold text-white">${{escapeHtml(item.title)}}</h2>
           ${{item.is_draft ? '<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-950 text-amber-300 border border-amber-800">User Draft</span>' : ''}}
         </div>
-        <div class="flex items-center gap-2">
+        <div class="detail-actions">
           ${{item.is_draft ? `
             <button onclick="scaffoldWork('${{item.id}}')" class="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1">
               Prepare structure
@@ -477,6 +481,9 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
           ` : ''}}
         </div>
       `;
+
+      html += workflowFields([['Active task', item.active_task], ['Next action', item.next_action]]);
+      html += workflowWarnings(item.warnings);
 
       // Goal / Objective
       if (item.goal) {{
@@ -547,6 +554,7 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
 
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center justify-between gap-2">
+                    ${{st.status === 'Blocked' && !isDone ? getStatusBadge('Blocked') : ''}}
                     <span id="st-title-text-${{st.id}}" class="text-xs leading-snug ${{isDone ? 'line-through text-gray-500' : 'text-gray-200 font-medium'}}">
                       ${{escapeHtml(st.title)}}
                     </span>
@@ -556,7 +564,8 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
                       class="text-gray-500 hover:text-gray-300 text-[11px] px-1 rounded hover:bg-gray-800 transition"
                     >✎</button>
                   </div>
-                  ${{st.owner ? `<div class="mt-1">${{getOwnerBadge(st.owner)}}</div>` : ''}}
+                  ${{st.owner ? `<div class="mt-1">${{getOwnerBadge(st.owner)}}</div>` : '<div>Owner: Unknown / not recorded</div>'}}
+                  ${{taskWorkflowMetadata(st)}}
                 </div>
 
                 <div class="flex items-center gap-1.5 shrink-0">
@@ -869,7 +878,7 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
       if (updated === null || updated.trim() === '' || updated.trim() === currentTitle) return;
 
       try {{
-        await apiPost('/api/subtasks/toggle', {{
+        const response = await apiPost('/api/subtasks/toggle', {{
           work_id: workId,
           subtask_id: subtaskId,
           title: updated.trim(),
@@ -878,7 +887,8 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
         if (item) {{
           const st = item.subtasks.find(s => s.id === subtaskId);
           if (st) {{
-            st.title = updated.trim();
+            if (response.subtask) Object.assign(st, response.subtask);
+            else st.title = updated.trim();
             renderDetail();
           }}
         }}

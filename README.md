@@ -162,3 +162,15 @@ Lifecycle saves use atomic replacement and version conflicts; run only one WorkW
 Changes to README, tasks.md, or task contracts after planning invalidate that context and require a fresh plan. Status/owner lines, checkbox progress, notes and comments do not invalidate it. This is a conservative work-file check, not a repository-wide source-code hash. Direct filesystem editing is outside API enforcement; agents must follow the project guidance.
 
 Comments remain available in every phase. Legacy task creation and renaming remain available as planning input; completion still requires enrollment, approval and explicit start. Draft task edits are planning context. Once a plan is submitted, change its tasks through a new plan revision. Completion updates are accepted only for tasks in the active approved plan. Static HTML exports support inspection, not lifecycle mutation.
+
+The **Blocked** count/filter includes work whose overall status is Blocked or which contains an unfinished blocked subtask. It counts affected work items once and can overlap In Progress. Task `## Blocked` sections and linked contracts marked Blocked produce task badges; checked tasks are treated as completed.
+
+## Shared workflow compatibility
+
+WorkWeave reads the shared `ai_skills/workflow-scaffold` Markdown format and older bold-label coordination files. The existing folders and files do not need migrating. Handoff owner/status, active task and next action are shown independently from task state. Any contract owner name is supported.
+
+For Markdown tasks, checklist sections determine state; checked tasks are completed. A linked contract supplies status when there is no recognized section, and supplies owner/dependency details. Conflicts appear as warnings instead of rewriting records. Work-level status still comes from INDEX.md. Managed `workflow.json` plans retain their own authority and approval gates.
+
+Task numbers or optional `**Task ID:**` fields become semantic task IDs. Existing API/comment IDs remain unchanged. UI renames retain the original ID using a small `<!-- ww-id:... -->` marker on that task line, preserving comments and contract links. Do not remove that marker during external editing. Manual edits to older, unmarked titles cannot retroactively preserve their former title-based comment IDs; WorkWeave does not guess these associations.
+
+`Depends on` supports comma/semicolon-separated task IDs and relative Markdown contract links (relative to the declaring contract). Known references link to their work item. Duplicate IDs, missing references and dependency cycles produce warnings. Prose dependencies remain visible without guessed edges. `Blocked by`, `Blocker reason` and `Next action` are displayed as recorded; missing values are Unknown, not None. A completed dependency suggests reassessing readiness and never automatically starts a task.

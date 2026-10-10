@@ -244,7 +244,10 @@ def create_handler_class(
                     if not work_id or not subtask_id:
                         raise ProjectError("work_id and subtask_id are required fields.")
                     ok = update_subtask(work_target, work_id, subtask_id, new_title=new_title, completed=completed)
-                    self.respond(200, {"status": "ok", "updated": ok})
+                    parsed = parse_work_directory(work_target)
+                    selected = next((item for item in parsed.items if item.id == work_id or item.folder_name == work_id), None)
+                    task = next((task for task in selected.subtasks if task.id == subtask_id), None) if selected else None
+                    self.respond(200, {"status": "ok", "updated": ok, "subtask": asdict(task) if task else None})
 
                 elif path == "/api/subtasks/new":
                     work_id = payload.get("work_id", "").strip()

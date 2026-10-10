@@ -1,0 +1,19 @@
+# Evidence
+
+2026-10-10: inspected maintained workflow-scaffold/coordinator sources and templates, WorkWeave parser and skill mapping. Shared source checkout was clean. Created pending contracts and exact proposed patch only. Existing Work006 changes preserved. No shared instructions or monitored project records modified.
+
+## Implementation and validation — 2026-10-10
+- User explicitly approved the exact shared patch and completing Work007. Applied only that patch to `/home/anu/git/ai_skills`; reverse apply-check confirms the maintained source matches the approved proposal. Both workflow skills pass skill-creator validation using `/usr/bin/python3`. Default Python lacked PyYAML; no dependency was installed. No installed workflow copies exist to synchronize; SKILLS.md points at the maintained source.
+- Added `workweave/workflow_format.py` for shared field parsing, enrichment and dependency validation; separate `static/workflow-metadata.js` renders metadata/warnings. Parser supports bullet and legacy bold handoffs, arbitrary owners, explicit/derived semantic task IDs and source precedence. No source records are rewritten by parsing.
+- Markdown checklist section takes precedence; linked contract supplies status only without a recognized section. Contract supplies owner; mismatches warn. Checked completion takes precedence. Managed JSON plans retain approval authority and plan-local dependency resolution.
+- Dependencies accept complete ID/link lists only, preserving other prose without inferred edges. Cross-work links resolve only against already loaded task contracts. Duplicate/unknown references and cycles warn; readiness never auto-starts work.
+- Task rename retains legacy API/comment ID through a task-local HTML comment marker, semantic ID, contract links and untouched lines/newline style. Duplicate mutation IDs and attempts to change semantic ID are rejected. API returns actual persisted task data so UI stays consistent.
+- `python3 -m unittest discover tests -v`: **49 passed**. Fixtures snapshot approved scaffold templates and exercise both formats, read-only byte preservation, owner/status conflicts, dependencies, cycles, duplicates, contract fallback, unknown paths, comments after rename and CRLF preservation. Existing lifecycle/API security regression tests pass.
+- `git diff --check` in both repositories: passed. Self-review (not independent) covered escaped rendering, no execution/fetching of dependency text, scoped writes, metadata precedence and preservation of lifecycle gates. No unresolved blocking findings.
+- Disposable browser preview at port 8093 showed arbitrary owner Research Agent, Active Task/Next Action, dependency 1.1, blocked reason with literal `<script>` text, and explicit contract/checklist conflict. No monitored project files were modified.
+- Compatibility limits: prose dependency text is displayed but cannot reliably form edges; older manual title edits without preserved identity markers cannot reconstruct lost comment associations. These cases are documented, not silently migrated.
+
+- Final Docker browser check revealed a false conflict on repeated ordinary `Completed:` notes. Restricted metadata keys to defined labels, added regression assertion, reran all 49 tests successfully. Rebuilt final image.
+- Review walkthrough: a Markdown-only project with no optional metadata remains readable and receives no lifecycle JSON; a blocked task with explicit 1.1 prerequisite displays the relationship but stays Blocked after 1.1 completes until its owner updates the workflow. These are compatibility checks, not autonomous-agent benchmarks.
+
+Final rebuilt Docker dashboard verified: task metadata renders, false Completed-note warnings absent, no browser console errors. Disposable preview server stopped. All five subtasks complete; no commits or pushes performed.

@@ -1,0 +1,48 @@
+/* Keep workflow controls below the full title, including inside narrow panels. */
+#detail-header {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 12px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+.detail-heading {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-width: 0;
+}
+.detail-number { flex: 0 0 auto; margin-top: 2px; }
+.detail-title {
+  flex: 1 1 180px;
+  min-width: 0;
+  margin: 0;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.detail-actions > * { flex: 0 0 auto; max-width: 100%; }
+.detail-actions a, .detail-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 6px 12px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.detail-actions a:hover { background: #4338ca; }
+.detail-actions a:focus-visible, .detail-actions button:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 3px;
+}

@@ -187,6 +187,22 @@ Configure PostgreSQL schema and migrations.
             self.assertFalse((work_dir / folder / "tasks" / "task-2.1.md").exists())
             self.assertNotIn("In Progress", (work_dir / "INDEX.md").read_text(encoding="utf-8"))
 
+    def test_blocked_subtasks_preserve_parent_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); work = root / 'work'; folder = work / 'work-001-test'
+            (folder / 'tasks').mkdir(parents=True)
+            (work / 'INDEX.md').write_text('- **Work 001 — Test** · In Progress · [work folder](work-001-test/)\n')
+            (folder / 'tasks.md').write_text('## Pending\n- [ ] 1.9.1 Gemini: API\n- [ ] Contract-only [dependency](tasks/blocked.md)\n## Blocked\n- [ ] 1.9.2 Codex: UI awaiting 1.9.1\n- [x] Resolved dependency\n## Other\n- [ ] Unclassified\n')
+            (folder / 'tasks/blocked.md').write_text('# Dependency\n**Status:** Blocked\n')
+            state = parse_work_directory(root)
+            item = state.items[0]
+            self.assertEqual(item.status, 'In Progress')
+            self.assertEqual(state.blocked_items, 1)
+            self.assertEqual([t.status for t in item.subtasks], ['Pending', 'Pending', 'Blocked', 'Completed', 'Pending'])
+            self.assertEqual(item.completed_subtasks, 1)
+            (folder / 'tasks.md').write_text('## Completed\n- [x] [Resolved](tasks/blocked.md)\n')
+            self.assertEqual(parse_work_directory(root).blocked_items, 0)
+
     def test_parse_real_crochet_work_dir(self):
         crochet_dir = Path("/home/anu/git/crochet")
         if (crochet_dir / "work").is_dir():
