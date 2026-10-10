@@ -15,7 +15,7 @@ Read [parent architecture and lifecycle](../README.md) and [decisions](../decisi
 - Out of scope: unrelated refactoring, new storage backend, automatic implementation, or shared-skill modifications.
 
 ## Dependencies and files
-- Depends on: None.
+- Depends on: None
 - Inspect/edit: Current models/parser, workflow services/repositories if Work 004 exists, tests and schema documentation.
 
 ## Test cases

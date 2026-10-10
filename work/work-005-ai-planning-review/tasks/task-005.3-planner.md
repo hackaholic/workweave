@@ -16,7 +16,7 @@ Read [parent architecture and lifecycle](../README.md) and [decisions](../decisi
 - Out of scope: unrelated refactoring, new storage backend, automatic implementation, or shared-skill modifications.
 
 ## Dependencies and files
-- Depends on: 005.1.
+- Depends on: 005.1
 - Inspect/edit: Planner service/adapter, pickup/return schema, UI planning controls, configuration documentation and tests.
 
 ## Test cases

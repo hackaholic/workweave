@@ -8,7 +8,8 @@
 Support bullet/bold coordination fields, arbitrary contract owners, heading states and deterministic status precedence. Preserve raw values and report conflicts; never infer no blockers from absent metadata.
 
 ## Dependencies and relevant files
-- Depends on: 007.1 format decision (existing-format parser fixes may proceed independently)
+- Depends on: 007.1
+- Dependency context: Format decision from 007.1; existing-format parser fixes may proceed independently.
 - Inspect/edit: relevant shared proposal/templates for 007.1; parser/schema/services, dashboard/views, tests and compatibility documentation for later tasks. Shared changes need exact proposal approval; no unrelated skills.
 
 ## Test cases

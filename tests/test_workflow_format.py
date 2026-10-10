@@ -87,3 +87,17 @@ class TestWorkflowFormat(unittest.TestCase):
         before=tasks.read_bytes()
         with self.assertRaises(ValueError): update_subtask(self.root,'work-001','Duplicate',new_title='Change')
         self.assertEqual(before,tasks.read_bytes())
+
+    def test_dependency_actionable_warnings(self):
+        self.contract('api.md', '1.1')
+        self.contract('ui.md', '1.2', depends='1.1 coordinate final classes')
+        (self.folder / 'tasks.md').write_text('## Pending\n- [ ] 1.1 [API](tasks/api.md)\n- [ ] 1.2 [UI](tasks/ui.md)\n')
+        tasks = parse_work_directory(self.root).items[0].subtasks
+        self.assertEqual(tasks[1].dependencies, [])
+        self.assertTrue(any('Put narrative under Dependency context' in w for w in tasks[1].warnings))
+        self.contract('clean.md', '1.3', depends='1.1, 1.2')
+        with (self.folder / 'tasks.md').open('a') as f: f.write('- [ ] 1.3 [Clean](tasks/clean.md)\n')
+        clean_task = parse_work_directory(self.root).items[0].subtasks[2]
+        self.assertEqual(clean_task.dependencies, ['1.1', '1.2'])
+        self.assertFalse(any('Dependency prose' in w for w in clean_task.warnings))
+

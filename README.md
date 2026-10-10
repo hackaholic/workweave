@@ -174,3 +174,7 @@ For Markdown tasks, checklist sections determine state; checked tasks are comple
 Task numbers or optional `**Task ID:**` fields become semantic task IDs. Existing API/comment IDs remain unchanged. UI renames retain the original ID using a small `<!-- ww-id:... -->` marker on that task line, preserving comments and contract links. Do not remove that marker during external editing. Manual edits to older, unmarked titles cannot retroactively preserve their former title-based comment IDs; WorkWeave does not guess these associations.
 
 `Depends on` supports comma/semicolon-separated task IDs and relative Markdown contract links (relative to the declaring contract). Known references link to their work item. Duplicate IDs, missing references and dependency cycles produce warnings. Prose dependencies remain visible without guessed edges. `Blocked by`, `Blocker reason` and `Next action` are displayed as recorded; missing values are Unknown, not None. A completed dependency suggests reassessing readiness and never automatically starts a task.
+
+### Task objective headings
+
+Use a non-empty `## Objective` section in new task contracts. WorkWeave also reads historical `Objective and context`, `Objective and scope`, `Objective and contract`, `Objective/context`, and `Objective/context and scope` headings. Missing or unreadable objectives produce a workflow warning; parsing never rewrites source records.

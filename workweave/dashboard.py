@@ -647,7 +647,8 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
                 <span class="text-xs font-bold text-white truncate">${{escapeHtml(c.title || c.filename)}}</span>
                 ${{c.status ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-300 font-medium">${{escapeHtml(c.status)}}</span>` : ''}}
               </div>
-              <p class="text-[11px] text-[var(--muted-foreground)] line-clamp-2">${{escapeHtml(c.objective || 'No objective stated.')}}</p>
+              <p class="text-[11px] text-[var(--muted-foreground)] line-clamp-2">${{escapeHtml(c.objective || 'Objective unavailable — check contract formatting.')}}</p>
+              ${{workflowWarnings(c.warnings)}}
               ${{c.owner ? `<div class="mt-2">${{getOwnerBadge(c.owner)}}</div>` : ''}}
             </div>
           `;
@@ -1065,9 +1066,11 @@ def generate_html_dashboard(state: WorkflowState, navigation: str = "", project_
           </div>
           <div>
             <h4 class="font-bold text-white uppercase text-[11px] mb-1">Objective</h4>
-            <p class="leading-relaxed bg-gray-900/60 p-2.5 rounded border border-[var(--border)]">${{escapeHtml(contract.objective || 'N/A')}}</p>
+            <p class="leading-relaxed bg-gray-900/60 p-2.5 rounded border border-[var(--border)]">${{escapeHtml(contract.objective || 'Objective unavailable — check contract formatting.')}}</p>
           </div>
       `;
+
+      bodyHtml += workflowWarnings(contract.warnings);
 
       if (contract.scope_in.length > 0) {{
         bodyHtml += `

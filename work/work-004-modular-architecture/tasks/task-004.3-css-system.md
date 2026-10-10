@@ -18,7 +18,7 @@ Read [architecture and compatibility rules](../README.md) and [decisions](../dec
 - Out of scope: changes excluded by the parent work item.
 
 ## Dependencies and relevant files
-- Depends on: 004.2.
+- Depends on: 004.2
 - Inspect/edit: static/css/{tokens,base,components,projects,dashboard}.css; templates/ and relevant renderer/JS class names.
 
 ## Test cases (defined before implementation)

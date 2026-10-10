@@ -214,7 +214,7 @@ def parse_task_contract(contract_file: Path, project_root: Path) -> TaskContract
             current_section = stripped[3:].strip().lower()
             continue
 
-        if current_section == "objective" and stripped and not stripped.startswith("#"):
+        if fmt.is_objective_heading(current_section) and stripped and not stripped.startswith("#"):
             if not contract.objective:
                 contract.objective = stripped
             else:
@@ -236,6 +236,8 @@ def parse_task_contract(contract_file: Path, project_root: Path) -> TaskContract
             if stripped.startswith("- [ ]") or stripped.startswith("- [x]"):
                 contract.acceptance_checks.append(stripped)
 
+    if not contract.objective:
+        contract.warnings.append('Objective could not be read. Add a non-empty ## Objective section to this contract.')
     contract.owner = meta.get('owner', contract.owner)
     contract.status = meta.get('status', contract.status)
     contract.task_id = contract.task_id or fmt.semantic_id(contract.title)

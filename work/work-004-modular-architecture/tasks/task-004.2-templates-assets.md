@@ -18,7 +18,7 @@ Read [architecture and compatibility rules](../README.md) and [decisions](../dec
 - Out of scope: changes excluded by the parent work item.
 
 ## Dependencies and relevant files
-- Depends on: 004.1.
+- Depends on: 004.1
 - Inspect/edit: views/, templates/, static resource manifest/allowlist; controllers/pages.py and http.py; dashboard.py, project_ui.py, pyproject.toml and rendering/export tests.
 
 ## Test cases (defined before implementation)

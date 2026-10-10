@@ -15,7 +15,7 @@ Read [parent architecture and lifecycle](../README.md) and [decisions](../decisi
 - Out of scope: unrelated refactoring, new storage backend, automatic implementation, or shared-skill modifications.
 
 ## Dependencies and files
-- Depends on: 005.1.
+- Depends on: 005.1
 - Inspect/edit: scaffold_draft_work, creation/scaffold endpoints, dashboard action labels and fixture tests.
 
 ## Test cases

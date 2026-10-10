@@ -69,7 +69,7 @@ def enrich(subtasks, contracts, folder, root):
         task.blocker_reason = contract.blocker_reason
         task.next_action = contract.next_action
         if task.depends_on and task.depends_on.lower() not in ('none', 'unknown') and not task.dependencies:
-            task.warnings.append('Dependency prose retained; no structured dependency inferred.')
+            task.warnings.append('Dependency prose retained; no structured dependency inferred. Put narrative under Dependency context and list only task IDs or links in Depends on.')
 
 
 def check_references(items):
@@ -111,3 +111,13 @@ def check_references(items):
                 task.warnings.append('Dependency cycle detected; resolve before pickup.'); break
             if node not in seen:
                 seen.add(node); pending.extend(graph.get(node, []))
+
+
+def is_objective_heading(heading):
+    """Read observed legacy headings; new contracts should use Objective."""
+    normalized = ' '.join(heading.lower().split())
+    return normalized in {
+        'objective', 'objective and context', 'objective and scope',
+        'objective and contract', 'objective/context',
+        'objective/context and scope',
+    }

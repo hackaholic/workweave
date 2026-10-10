@@ -18,7 +18,7 @@ Read [architecture and compatibility rules](../README.md) and [decisions](../dec
 - Out of scope: changes excluded by the parent work item.
 
 ## Dependencies and relevant files
-- Depends on: None.
+- Depends on: None
 - Inspect/edit: models.py, errors.py, config.py, controllers/, services/, repositories/, parsing/; existing parser.py, projects.py, server.py, cli.py, __init__.py and tests.
 
 ## Test cases (defined before implementation)

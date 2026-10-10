@@ -8,3 +8,7 @@
 - **Work 006 — Subtask blocker visibility** · Completed · [work folder](work-006-subtask-blockers/)
 - **Work 007 — Shared workflow and parser compatibility** · Completed · [work folder](work-007-workflow-compatibility/)
 - **Work 008 — Responsive detail header** · Completed · [work folder](work-008-detail-header/)
+
+- **Work 009 — Structured dependency metadata and warning repair** · Completed · [work folder](work-009-dependency-metadata/)
+
+- **Work 010 — Task objective compatibility** · Completed · [work folder](work-010-task-objectives/)
